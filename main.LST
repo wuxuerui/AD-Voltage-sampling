@@ -1,0 +1,181 @@
+C51 COMPILER V9.54   MAIN                                                                  06/07/2017 14:33:23 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c ROM(SMALL) OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          /*
+   2           * This is a program for testing AD7606 used STC89C52RC
+   3           * The line connecting AD7606 with STC89C52RC is:
+   4           * STC89C52RC    |    AD7606
+   5           *   P0      |    DB[0:7]
+   6           *   P2          |    DB[8:15]
+   7           *   OS0         |    P1^0
+   8           *   OS1         |    P1^1
+   9           *   OS2         |    P1^2
+  10           *   rage        |    P1^3
+  11           *   convst      |    P1^4
+  12           *   busy        |    P1^5
+  13           *   rst         |    P1^6
+  14           *   rd_and_cs   |    P1^7
+  15           *   green_led   |    P3^6
+  16           *   red_led     |    P3^7
+  17           *   GND     |    GND
+  18           *   +5V     |    VCC
+  19           *   green_led   |    P3_6
+  20           *   red_led     |    P3_7
+  21           * Author : jinming chen
+  22           * Compang : Hongwei in dongguan
+  23           * Date : Sep 1 ,2015
+  24           */
+  25          
+  26          #include <reg52.h>
+  27          #include <intrins.h>
+  28          #include <stdio.h>
+  29          #include "AD7076.h"
+  30          #include "other.h"
+  31          
+  32          //uchar introduce1[] = "This is a program "; 
+  33          //uchar introduce2[] = "for testing AD7606\r\n";
+  34          
+  35          uchar newline[] = "\r\n";
+  36          uchar space  [] = " ";
+  37          
+  38            int time=0;
+  39            int count=0;
+  40            int adcdata;
+  41          /*
+  42          uchar *data_to_string(uchar Data)
+  43          {
+  44            uchar tmp;
+  45            tmp = Data & 0x0f;
+  46            str[1] =DB_str[binary_to_decimal(tmp)];
+  47            tmp = Data>>4;
+  48            str[0] =DB_str[binary_to_decimal(tmp)];
+  49            return str;
+  50          }
+  51          */
+  52          
+  53          
+  54          void serial_init(void)
+  55          {
+C51 COMPILER V9.54   MAIN                                                                  06/07/2017 14:33:23 PAGE 2   
+
+  56   1        SCON = 0x50;  //UART为模式一，8位数据，允许接收
+  57   1        TMOD |= 0x20; //定时器1为模式二，8位自动重装
+  58   1        PCON |= 0x80; //SMOD=1
+  59   1        TH1 =0xfd;    //波特率为19200，晶振频率为11.0592MHz
+  60   1        IE = 0x00;
+  61   1        TR1 = 1;
+  62   1        TI = 1; 
+  63   1      }
+  64          
+  65          //向串口发送一个函数
+  66          void serial_send_byte(uchar ch) 
+  67          { 
+  68   1        SBUF=ch; 
+  69   1          while (TI== 0); 
+  70   1          TI = 0 ; 
+  71   1      }
+  72          
+  73          
+  74          //向串口发送一串字符数据
+  75          void serial_send_string(uchar *p)
+  76          {
+  77   1        while(*p != '\0')
+  78   1        {
+  79   2          SBUF = *p;
+  80   2          while(TI == 0);
+  81   2          TI = 0;
+  82   2          p++;
+  83   2        }   
+  84   1      }
+  85           void Timer1Init(void)    //10??@11.0592MHz
+  86          {
+  87   1        TMOD |= 0x10; 
+  88   1        TL0 = 0xA4;   //??????
+  89   1        TH0 = 0xFF;
+  90   1        TF0 = 0;    
+  91   1        TR0 = 1;    
+  92   1         EA = 1;              
+  93   1          ET0 = 1;         
+  94   1      }
+  95          int main()
+  96          {
+  97   1        struct DB_data_struct *DB_data;
+  98   1        uchar k,tmp;
+  99   1        uchar adctx[6]={'\0'};
+ 100   1        uchar adctx2[3]={'\0'};
+ 101   1        serial_init();
+ 102   1        AD7606_init();
+ 103   1        while(1)
+ 104   1        {
+ 105   2          AD7606_startconvst();
+ 106   2          while((busy == 1))    //当busy为低电平时，数据转换完毕，此时可以读取数据
+ 107   2          {
+ 108   3            ;
+ 109   3          }
+ 110   2          DB_data = AD7606_read_data();
+ 111   2          adcdata=((int)(DB_data->DB_data_H)<<8)|((int)(DB_data->DB_data_L));
+ 112   2          if(adcdata<0)
+ 113   2          {
+ 114   3            adcdata=-(int)(adcdata*0.00152588);
+ 115   3      
+ 116   3            
+ 117   3            serial_send_byte('-');
+C51 COMPILER V9.54   MAIN                                                                  06/07/2017 14:33:23 PAGE 3   
+
+ 118   3            adctx2[0]=adcdata/10+'0';
+ 119   3            adctx2[1]=adcdata%10+'0';
+ 120   3            serial_send_string(adctx2);
+ 121   3            serial_send_byte('\n');
+ 122   3          }
+ 123   2          else
+ 124   2            {   
+ 125   3            adcdata=(int)(adcdata*0.00152588);
+ 126   3            
+ 127   3            
+ 128   3          
+ 129   3          adctx2[0]=adcdata/10+'0';
+ 130   3          adctx2[1]=adcdata%10+'0';
+ 131   3          serial_send_string(adctx2);
+ 132   3          serial_send_byte('\n');
+ 133   3          }
+ 134   2      
+ 135   2            DB_data += 8;
+ 136   2           
+ 137   2          
+ 138   2          
+ 139   2        //delay_ms(1);
+ 140   2        }
+ 141   1        return 0; 
+ 142   1      }
+*** WARNING C280 IN LINE 98 OF main.c: 'k': unreferenced local variable
+*** WARNING C280 IN LINE 98 OF main.c: 'tmp': unreferenced local variable
+ 143          
+ 144          void Timer0_ISR(void)   interrupt  1      //10us
+ 145          {
+ 146   1         TL0 = 0xA4;    //??????
+ 147   1        TH0 = 0xFF;
+ 148   1         count++;
+ 149   1      
+ 150   1             
+ 151   1      }
+*** WARNING C294 IN LINE 141 OF main.c: unreachable code
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    269    ----
+   CONSTANT SIZE    =      9    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     11      14
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)
